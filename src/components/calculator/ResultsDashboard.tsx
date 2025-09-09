@@ -42,7 +42,7 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
   onCopyConfig
 }) => {
   const memoryUtilization = selectedGpu ? 
-    (performanceMetrics.memoryUsage / (selectedGpu.memory * gpuCount)) * 100 : 0;
+    (performanceMetrics.memoryUsage.gpu / (selectedGpu.memory * gpuCount)) * 100 : 0;
 
   const performanceScore = Math.min(100, 
     (performanceMetrics.tokensPerSecond / 100) * 40 + 
@@ -148,9 +148,14 @@ export const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{performanceMetrics.memoryUsage}GB</div>
+            <div className="text-2xl font-bold">{performanceMetrics.memoryUsage.gpu}GB</div>
             <div className="text-xs text-muted-foreground">
-              VRAM Utilized
+              GPU VRAM Used
+            </div>
+            <div className="mt-2 space-y-1 text-xs">
+              <div>CPU: {performanceMetrics.memoryUsage.cpu}GB</div>
+              <div>RAM: {performanceMetrics.memoryUsage.ram}GB</div>
+              <div>NVMe: {performanceMetrics.memoryUsage.nvme}GB</div>
             </div>
           </CardContent>
         </Card>

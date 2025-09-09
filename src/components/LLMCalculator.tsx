@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { DeploymentSelector } from './calculator/DeploymentSelector';
-import { ModelSelector } from './calculator/ModelSelector';
+import { ProviderSelector } from './calculator/ProviderSelector';
+import { ModelSelectorAdvanced } from './calculator/ModelSelectorAdvanced';
 import { HardwareConfigurator } from './calculator/HardwareConfigurator';
 import { PerformanceSettings } from './calculator/PerformanceSettings';
 import { UsageSimulator } from './calculator/UsageSimulator';
 import { CostAnalyzer } from './calculator/CostAnalyzer';
 import { ResultsDashboard } from './calculator/ResultsDashboard';
+import { SimulationDisplay } from './calculator/SimulationDisplay';
 import { Button } from '@/components/ui/button';
 import { Calculator } from 'lucide-react';
 import { 
@@ -31,7 +33,6 @@ import {
 export const LLMCalculator = () => {
   const { toast } = useToast();
   
-  // State management
   const [state, setState] = useState<CalculatorState>({
     deploymentType: undefined,
     quantization: QUANTIZATION_OPTIONS[0],
@@ -41,6 +42,9 @@ export const LLMCalculator = () => {
     expectedUsers: 10,
     requestsPerHour: 100,
     tokensPerRequest: 150,
+    concurrentUsers: 5,
+    contextWindow: 4096,
+    offloading: { cpu: 0, ram: 0, nvme: 0 },
     gpus: []
   });
   
@@ -49,6 +53,7 @@ export const LLMCalculator = () => {
   const [ramAmount, setRamAmount] = useState(64);
   const [storageAmount, setStorageAmount] = useState(500);
   const [results, setResults] = useState<any>(null);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Handlers
   const handleDeploymentTypeChange = (type: 'cloud' | 'physical') => {
@@ -85,13 +90,14 @@ export const LLMCalculator = () => {
     const selectedGpu = state.gpus[0];
     
     if (!selectedModel || !selectedGpu) {
-      return {
-        tokensPerSecond: 0,
-        latency: 0,
-        throughput: 0,
-        concurrentUsers: 0,
-        memoryUsage: 0
-      };
+    return {
+      tokensPerSecond: 0,
+      latency: 0,
+      throughput: 0,
+      concurrentUsers: 0,
+      memoryUsage: { gpu: 0, cpu: 0, ram: 0, nvme: 0 },
+      perUserMetrics: { gpuMemory: 0, cpuMemory: 0, electricityCost: 0 }
+    };
     }
 
     const baseTokensPerSecond = selectedGpu.bandwidth / 100 * quantization.performanceImpact;
@@ -103,12 +109,27 @@ export const LLMCalculator = () => {
     const throughput = tokensPerSecond / state.tokensPerRequest;
     const memoryUsage = selectedModel.memoryRequired * quantization.memoryReduction * framework.memoryOverhead;
     
+    const gpuMemoryUsage = memoryUsage;
+    const cpuMemoryUsage = memoryUsage * (state.offloading.cpu / 100);
+    const ramMemoryUsage = memoryUsage * (state.offloading.ram / 100);
+    const nvmeMemoryUsage = memoryUsage * (state.offloading.nvme / 100);
+
     return {
       tokensPerSecond: Math.round(tokensPerSecond),
       latency: Math.round(latency),
       throughput: Math.round(throughput * 10) / 10,
       concurrentUsers,
-      memoryUsage: Math.round(memoryUsage)
+      memoryUsage: { 
+        gpu: Math.round(gpuMemoryUsage), 
+        cpu: Math.round(cpuMemoryUsage), 
+        ram: Math.round(ramMemoryUsage), 
+        nvme: Math.round(nvmeMemoryUsage) 
+      },
+      perUserMetrics: {
+        gpuMemory: Math.round(gpuMemoryUsage / concurrentUsers * 100) / 100,
+        cpuMemory: Math.round(cpuMemoryUsage / concurrentUsers * 100) / 100,
+        electricityCost: 0.12 // $0.12 per user per hour estimate
+      }
     };
   };
 
@@ -143,14 +164,14 @@ export const LLMCalculator = () => {
       }
     }
     
-    if (state.selectedModel && state.gpus[0]) {
-      const memoryRequired = state.selectedModel.memoryRequired * state.quantization.memoryReduction;
-      const availableMemory = state.gpus[0].memory * gpuCount;
-      
-      if (memoryRequired > availableMemory) {
-        errors.push(`Model requires ${memoryRequired}GB but only ${availableMemory}GB available`);
+      if (state.selectedModel && state.gpus[0]) {
+        const memoryRequired = state.selectedModel.memoryRequired * state.quantization.memoryReduction;
+        const availableMemory = state.gpus[0].memory * gpuCount;
+        
+        if (memoryRequired > availableMemory) {
+          errors.push(`Model requires ${memoryRequired}GB but only ${availableMemory}GB available`);
+        }
       }
-    }
     
     return {
       isValid: errors.length === 0,
@@ -260,11 +281,16 @@ export const LLMCalculator = () => {
             onProviderChange={handleProviderChange}
           />
 
-          <ModelSelector
-            selectedModel={state.selectedModel}
-            huggingFaceApiKey={state.huggingFaceApiKey}
-            onModelSelect={handleModelSelect}
+          <ProviderSelector
+            selectedProvider={state.selectedProvider}
+            onProviderSelect={(provider) => setState(prev => ({ ...prev, selectedProvider: provider }))}
             onApiKeyChange={handleApiKeyChange}
+          />
+
+          <ModelSelectorAdvanced
+            selectedProvider={state.selectedProvider}
+            selectedModel={state.selectedModel}
+            onModelSelect={handleModelSelect}
           />
 
           <HardwareConfigurator
@@ -337,18 +363,29 @@ export const LLMCalculator = () => {
 
       {/* Results Dashboard */}
       {results && (
-        <ResultsDashboard
-          selectedModel={state.selectedModel}
-          selectedGpu={state.gpus[0]}
-          selectedCpu={state.cpu}
-          gpuCount={gpuCount}
-          performanceMetrics={results.performanceMetrics}
-          validationResult={results.validation}
-          totalCost={results.totalCost}
-          monthlyCost={results.monthlyCost}
-          onExportConfig={handleExportConfig}
-          onCopyConfig={handleCopyConfig}
-        />
+        <div className="space-y-6">
+          <ResultsDashboard
+            selectedModel={state.selectedModel}
+            selectedGpu={state.gpus[0]}
+            selectedCpu={state.cpu}
+            gpuCount={gpuCount}
+            performanceMetrics={results.performanceMetrics}
+            validationResult={results.validation}
+            totalCost={results.totalCost}
+            monthlyCost={results.monthlyCost}
+            onExportConfig={handleExportConfig}
+            onCopyConfig={handleCopyConfig}
+          />
+          
+          <SimulationDisplay
+            selectedModel={state.selectedModel}
+            performanceMetrics={results.performanceMetrics}
+            isRunning={isSimulationRunning}
+            onStartSimulation={() => setIsSimulationRunning(true)}
+            onStopSimulation={() => setIsSimulationRunning(false)}
+            onResetSimulation={() => setIsSimulationRunning(false)}
+          />
+        </div>
       )}
     </div>
   );
