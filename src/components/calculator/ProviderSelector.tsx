@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Brain, Key, Cloud, HardDrive, Zap } from 'lucide-react';
-import { LLM_PROVIDERS } from '@/data/models';
+import { useLLMProviders } from '@/hooks/useProviderData';
 import { LLMProvider } from '@/types/calculator';
 
 interface ProviderSelectorProps {
@@ -24,8 +24,19 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'api' | 'opensource'>('all');
+  const { data: providers = [], isLoading } = useLLMProviders();
 
-  const filteredProviders = LLM_PROVIDERS.filter(provider => 
+  if (isLoading) {
+    return (
+      <Card className="shadow-card">
+        <CardContent className="p-6">
+          <div className="text-center">Loading providers...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const filteredProviders = providers.filter(provider => 
     selectedCategory === 'all' || provider.type === selectedCategory
   );
 
@@ -76,7 +87,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
           <Select 
             value={selectedProvider?.id} 
             onValueChange={(value) => {
-              const provider = LLM_PROVIDERS.find(p => p.id === value);
+              const provider = providers.find(p => p.id === value);
               if (provider) onProviderSelect(provider);
             }}
           >

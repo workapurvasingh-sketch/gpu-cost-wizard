@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Zap, Database } from 'lucide-react';
-import { QUANTIZATION_OPTIONS, DEPLOYMENT_FRAMEWORKS } from '@/data/models';
+import { useQuantizationOptions, useDeploymentFrameworks } from '@/hooks/useProviderData';
 import { QuantizationOption, DeploymentFramework, LLMModel } from '@/types/calculator';
 
 interface PerformanceSettingsProps {
@@ -32,11 +32,24 @@ export const PerformanceSettings: React.FC<PerformanceSettingsProps> = ({
   onBatchSizeChange,
   onKvCacheChange
 }) => {
-  const availableQuantizations = selectedModel 
-    ? QUANTIZATION_OPTIONS.filter(q => selectedModel.quantizationSupport.includes(q.id))
-    : QUANTIZATION_OPTIONS;
+  const { data: quantizationOptions = [], isLoading: quantLoading } = useQuantizationOptions();
+  const { data: deploymentFrameworks = [], isLoading: frameworksLoading } = useDeploymentFrameworks();
 
-  const availableFrameworks = DEPLOYMENT_FRAMEWORKS.filter(f =>
+  if (quantLoading || frameworksLoading) {
+    return (
+      <Card className="shadow-card">
+        <CardContent className="p-6">
+          <div className="text-center">Loading performance options...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const availableQuantizations = selectedModel 
+    ? quantizationOptions.filter(q => selectedModel.quantizationSupport.includes(q.id))
+    : quantizationOptions;
+
+  const availableFrameworks = deploymentFrameworks.filter(f =>
     f.supportedQuantization.includes(quantization.id)
   );
 
@@ -59,7 +72,7 @@ export const PerformanceSettings: React.FC<PerformanceSettingsProps> = ({
           <Select 
             value={quantization.id} 
             onValueChange={(value) => {
-              const quant = QUANTIZATION_OPTIONS.find(q => q.id === value);
+              const quant = quantizationOptions.find(q => q.id === value);
               if (quant) onQuantizationChange(quant);
             }}
           >
@@ -107,7 +120,7 @@ export const PerformanceSettings: React.FC<PerformanceSettingsProps> = ({
           <Select 
             value={framework.id} 
             onValueChange={(value) => {
-              const fw = DEPLOYMENT_FRAMEWORKS.find(f => f.id === value);
+              const fw = deploymentFrameworks.find(f => f.id === value);
               if (fw) onFrameworkChange(fw);
             }}
           >

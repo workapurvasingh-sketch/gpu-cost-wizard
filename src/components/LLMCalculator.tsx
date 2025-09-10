@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  useQuantizationOptions, 
+  useDeploymentFrameworks,
+  useLLMModels 
+} from '@/hooks/useProviderData';
 import { DeploymentSelector } from './calculator/DeploymentSelector';
 import { ProviderSelector } from './calculator/ProviderSelector';
 import { ModelSelectorAdvanced } from './calculator/ModelSelectorAdvanced';
@@ -22,21 +27,17 @@ import {
   CostBreakdown,
   CalculatorState
 } from '@/types/calculator';
-import { 
-  POPULAR_MODELS, 
-  GPU_OPTIONS, 
-  CPU_OPTIONS, 
-  QUANTIZATION_OPTIONS, 
-  DEPLOYMENT_FRAMEWORKS 
-} from '@/data/models';
 
 export const LLMCalculator = () => {
   const { toast } = useToast();
+  const { data: quantizationOptions = [], isLoading: quantLoading } = useQuantizationOptions();
+  const { data: deploymentFrameworks = [], isLoading: frameworksLoading } = useDeploymentFrameworks();
+  const { data: models = [], isLoading: modelsLoading } = useLLMModels();
   
   const [state, setState] = useState<CalculatorState>({
     deploymentType: undefined,
-    quantization: QUANTIZATION_OPTIONS[0],
-    framework: DEPLOYMENT_FRAMEWORKS[0],
+    quantization: quantizationOptions[0] || { id: 'fp16', name: 'FP16', bitsPerWeight: 16, memoryReduction: 1, performanceImpact: 1 },
+    framework: deploymentFrameworks[0] || { id: 'vllm', name: 'vLLM', throughputMultiplier: 2.5, memoryOverhead: 1.2, supportedQuantization: [], supportsOffloading: true, offloadingTypes: [] },
     batchSize: 1,
     kvCache: true,
     expectedUsers: 10,
@@ -47,6 +48,33 @@ export const LLMCalculator = () => {
     offloading: { cpu: 0, ram: 0, nvme: 0 },
     gpus: []
   });
+
+  // Update state when data loads
+  React.useEffect(() => {
+    if (quantizationOptions.length > 0 && !state.quantization?.id) {
+      setState(prev => ({ ...prev, quantization: quantizationOptions[0] }));
+    }
+  }, [quantizationOptions]);
+
+  React.useEffect(() => {
+    if (deploymentFrameworks.length > 0 && !state.framework?.id) {
+      setState(prev => ({ ...prev, framework: deploymentFrameworks[0] }));
+    }
+  }, [deploymentFrameworks]);
+
+  if (quantLoading || frameworksLoading || modelsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <Calculator className="w-12 h-12 mx-auto mb-4 animate-spin" />
+            <h1 className="text-3xl font-bold mb-2">LLM Deployment Calculator</h1>
+            <p className="text-muted-foreground">Loading calculator data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   const [concurrentUsers, setConcurrentUsers] = useState(5);
   const [gpuCount, setGpuCount] = useState(1);
