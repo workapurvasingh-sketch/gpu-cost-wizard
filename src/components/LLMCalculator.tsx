@@ -3,7 +3,8 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   useQuantizationOptions, 
   useDeploymentFrameworks,
-  useLLMModels 
+  useLLMModels,
+  useLLMProviders
 } from '@/hooks/useProviderData';
 import { DeploymentSelector } from './calculator/DeploymentSelector';
 import { ProviderSelector } from './calculator/ProviderSelector';
@@ -14,10 +15,14 @@ import { UsageSimulator } from './calculator/UsageSimulator';
 import { CostAnalyzer } from './calculator/CostAnalyzer';
 import { ResultsDashboard } from './calculator/ResultsDashboard';
 import { SimulationDisplay } from './calculator/SimulationDisplay';
+import { APIConfiguration } from './calculator/APIConfiguration';
+import { CloudInstanceSelector } from './calculator/CloudInstanceSelector';
 import { Button } from '@/components/ui/button';
-import { Calculator } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calculator, ArrowRight, Zap, Server } from 'lucide-react';
 import { 
   LLMModel, 
+  LLMProvider,
   GPU, 
   CPU, 
   QuantizationOption, 
@@ -25,7 +30,9 @@ import {
   PerformanceMetrics, 
   ValidationResult, 
   CostBreakdown,
-  CalculatorState
+  CalculatorState,
+  CloudProvider,
+  CloudInstance
 } from '@/types/calculator';
 
 export const LLMCalculator = () => {
@@ -33,6 +40,7 @@ export const LLMCalculator = () => {
   const { data: quantizationOptions = [], isLoading: quantLoading } = useQuantizationOptions();
   const { data: deploymentFrameworks = [], isLoading: frameworksLoading } = useDeploymentFrameworks();
   const { data: models = [], isLoading: modelsLoading } = useLLMModels();
+  const { data: providers = [], isLoading: providersLoading } = useLLMProviders();
   
   // All useState hooks must be at the top, before any conditional returns
   const [state, setState] = useState<CalculatorState>({
@@ -57,6 +65,14 @@ export const LLMCalculator = () => {
   const [results, setResults] = useState<any>(null);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
+  // Dynamic flow state
+  const [currentStep, setCurrentStep] = useState<'provider' | 'model' | 'deployment' | 'config'>('provider');
+  const [selectedProvider, setSelectedProvider] = useState<LLMProvider | undefined>();
+  const [selectedCloudProvider, setSelectedCloudProvider] = useState<CloudProvider | undefined>();
+  const [selectedCloudInstance, setSelectedCloudInstance] = useState<CloudInstance | undefined>();
+  const [contextWindow, setContextWindow] = useState(4096);
+  const [concurrentRequests, setConcurrentRequests] = useState(5);
+
   // Update state when data loads
   React.useEffect(() => {
     if (quantizationOptions.length > 0 && !state.quantization?.id) {
@@ -70,7 +86,7 @@ export const LLMCalculator = () => {
     }
   }, [deploymentFrameworks]);
 
-  if (quantLoading || frameworksLoading || modelsLoading) {
+  if (quantLoading || frameworksLoading || modelsLoading || providersLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 p-6">
         <div className="max-w-7xl mx-auto">
@@ -300,8 +316,85 @@ export const LLMCalculator = () => {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left Column - Configuration */}
+      {/* Progress Steps */}
+      <Card>
+        <CardHeader>
+          <CardTitle>LLM Deployment Calculator</CardTitle>
+          <CardDescription>
+            Configure your LLM deployment step by step
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            {[
+              { key: 'provider', label: 'Provider', icon: Zap },
+              { key: 'model', label: 'Model', icon: Calculator },
+              { key: 'deployment', label: 'Deployment', icon: Server },
+              { key: 'config', label: 'Configuration', icon: ArrowRight }
+            ].map(({ key, label, icon: Icon }, index) => (
+              <div key={key} className="flex items-center">
+                <div
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                    currentStep === key
+                      ? 'bg-primary text-primary-foreground'
+                      : index < ['provider', 'model', 'deployment', 'config'].indexOf(currentStep)
+                      ? 'bg-success text-success-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{label}</span>
+                </div>
+                {index < 3 && (
+                  <ArrowRight className="w-4 h-4 mx-2 text-muted-foreground" />
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 1: Provider Selection */}
+      {currentStep === 'provider' && (
+        <ProviderSelector
+          selectedProvider={selectedProvider}
+          onProviderSelect={(provider) => {
+            setSelectedProvider(provider);
+            setCurrentStep('model');
+          }}
+          onApiKeyChange={() => {}}
+        />
+      )}
+
+      {/* Step 2: Model Selection */}
+      {currentStep === 'model' && selectedProvider && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Selected Provider: {selectedProvider.name}</CardTitle>
+              <CardDescription>{selectedProvider.description}</CardDescription>
+            </CardHeader>
+          </Card>
+
+          <ModelSelectorAdvanced
+            selectedProvider={selectedProvider}
+            selectedModel={state.selectedModel}
+            onModelSelect={(model) => {
+              handleModelSelect(model);
+              setCurrentStep(selectedProvider.type === 'api' ? 'config' : 'deployment');
+            }}
+          />
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCurrentStep('provider')}>
+              Back to Provider
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Deployment Configuration (for Open Source models only) */}
+      {currentStep === 'deployment' && selectedProvider?.type === 'opensource' && (
         <div className="space-y-6">
           <DeploymentSelector
             deploymentType={state.deploymentType}
@@ -310,85 +403,124 @@ export const LLMCalculator = () => {
             onProviderChange={handleProviderChange}
           />
 
-          <ProviderSelector
-            selectedProvider={state.selectedProvider}
-            onProviderSelect={(provider) => setState(prev => ({ ...prev, selectedProvider: provider }))}
-            onApiKeyChange={handleApiKeyChange}
-          />
+          {state.deploymentType === 'cloud' && (
+            <CloudInstanceSelector
+              selectedProvider={selectedCloudProvider}
+              selectedInstance={selectedCloudInstance}
+              onProviderChange={setSelectedCloudProvider}
+              onInstanceChange={setSelectedCloudInstance}
+            />
+          )}
 
-          <ModelSelectorAdvanced
-            selectedProvider={state.selectedProvider}
-            selectedModel={state.selectedModel}
-            onModelSelect={handleModelSelect}
-          />
-
-          <HardwareConfigurator
-            deploymentType={state.deploymentType}
-            selectedProvider={state.cloudProvider}
-            selectedGpus={state.gpus}
-            gpuCount={gpuCount}
-            selectedCpu={state.cpu}
-            ramAmount={ramAmount}
-            storageAmount={storageAmount}
-            onGpuChange={handleGpuChange}
-            onGpuCountChange={setGpuCount}
-            onCpuChange={handleCpuChange}
-            onRamChange={setRamAmount}
-            onStorageChange={setStorageAmount}
-          />
+          {state.deploymentType && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setCurrentStep('model')}>
+                Back to Model
+              </Button>
+              <Button onClick={() => setCurrentStep('config')}>
+                Continue to Configuration
+              </Button>
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Right Column - Performance & Usage */}
+      {/* Step 4: Configuration */}
+      {currentStep === 'config' && (
         <div className="space-y-6">
-          <PerformanceSettings
-            selectedModel={state.selectedModel}
-            quantization={state.quantization}
-            framework={state.framework}
-            batchSize={state.batchSize}
-            kvCache={state.kvCache}
-            onQuantizationChange={(q) => setState(prev => ({ ...prev, quantization: q }))}
-            onFrameworkChange={(f) => setState(prev => ({ ...prev, framework: f }))}
-            onBatchSizeChange={(size) => setState(prev => ({ ...prev, batchSize: size }))}
-            onKvCacheChange={(enabled) => setState(prev => ({ ...prev, kvCache: enabled }))}
-          />
+          {selectedProvider?.type === 'api' ? (
+            // API Configuration
+            <APIConfiguration
+              selectedModel={state.selectedModel}
+              contextWindow={contextWindow}
+              onContextWindowChange={setContextWindow}
+              expectedUsers={state.expectedUsers}
+              onExpectedUsersChange={(users) => setState(prev => ({ ...prev, expectedUsers: users }))}
+              requestsPerHour={state.requestsPerHour}
+              onRequestsPerHourChange={(requests) => setState(prev => ({ ...prev, requestsPerHour: requests }))}
+              concurrentRequests={concurrentRequests}
+              onConcurrentRequestsChange={setConcurrentRequests}
+            />
+          ) : (
+            // Open Source Configuration
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                {state.deploymentType === 'physical' && (
+                  <HardwareConfigurator
+                    deploymentType={state.deploymentType}
+                    selectedProvider={state.cloudProvider}
+                    selectedGpus={state.gpus}
+                    gpuCount={gpuCount}
+                    selectedCpu={state.cpu}
+                    ramAmount={ramAmount}
+                    storageAmount={storageAmount}
+                    onGpuChange={handleGpuChange}
+                    onGpuCountChange={setGpuCount}
+                    onCpuChange={handleCpuChange}
+                    onRamChange={setRamAmount}
+                    onStorageChange={setStorageAmount}
+                  />
+                )}
 
-          <UsageSimulator
-            expectedUsers={state.expectedUsers}
-            requestsPerHour={state.requestsPerHour}
-            tokensPerRequest={state.tokensPerRequest}
-            concurrentUsers={concurrentUsers}
-            onExpectedUsersChange={(users) => setState(prev => ({ ...prev, expectedUsers: users }))}
-            onRequestsPerHourChange={(requests) => setState(prev => ({ ...prev, requestsPerHour: requests }))}
-            onTokensPerRequestChange={(tokens) => setState(prev => ({ ...prev, tokensPerRequest: tokens }))}
-            onConcurrentUsersChange={setConcurrentUsers}
-          />
+                <PerformanceSettings
+                  selectedModel={state.selectedModel}
+                  quantization={state.quantization}
+                  framework={state.framework}
+                  batchSize={state.batchSize}
+                  kvCache={state.kvCache}
+                  onQuantizationChange={(q) => setState(prev => ({ ...prev, quantization: q }))}
+                  onFrameworkChange={(f) => setState(prev => ({ ...prev, framework: f }))}
+                  onBatchSizeChange={(size) => setState(prev => ({ ...prev, batchSize: size }))}
+                  onKvCacheChange={(enabled) => setState(prev => ({ ...prev, kvCache: enabled }))}
+                />
+              </div>
 
-          <CostAnalyzer
-            deploymentType={state.deploymentType}
-            selectedGpus={state.gpus}
-            gpuCount={gpuCount}
-            selectedCpu={state.cpu}
-            ramAmount={ramAmount}
-            storageAmount={storageAmount}
-            requestsPerHour={state.requestsPerHour}
-            costBreakdown={{} as CostBreakdown}
-          />
+              <div className="space-y-6">
+                <UsageSimulator
+                  expectedUsers={state.expectedUsers}
+                  requestsPerHour={state.requestsPerHour}
+                  tokensPerRequest={state.tokensPerRequest}
+                  concurrentUsers={concurrentUsers}
+                  onExpectedUsersChange={(users) => setState(prev => ({ ...prev, expectedUsers: users }))}
+                  onRequestsPerHourChange={(requests) => setState(prev => ({ ...prev, requestsPerHour: requests }))}
+                  onTokensPerRequestChange={(tokens) => setState(prev => ({ ...prev, tokensPerRequest: tokens }))}
+                  onConcurrentUsersChange={setConcurrentUsers}
+                />
+
+                <CostAnalyzer
+                  deploymentType={state.deploymentType}
+                  selectedGpus={state.gpus}
+                  gpuCount={gpuCount}
+                  selectedCpu={state.cpu}
+                  ramAmount={ramAmount}
+                  storageAmount={storageAmount}
+                  requestsPerHour={state.requestsPerHour}
+                  costBreakdown={{} as CostBreakdown}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentStep(selectedProvider?.type === 'api' ? 'model' : 'deployment')}
+            >
+              Back
+            </Button>
+            <Button 
+              onClick={handleCalculate} 
+              size="lg" 
+              variant="gradient"
+              className="px-12"
+              disabled={!state.selectedModel}
+            >
+              <Calculator className="w-5 h-5 mr-2" />
+              Calculate Requirements
+            </Button>
+          </div>
         </div>
-      </div>
-
-      {/* Calculate Button */}
-      <div className="flex justify-center">
-        <Button 
-          onClick={handleCalculate} 
-          size="lg" 
-          variant="gradient"
-          className="px-12 py-6 text-lg"
-          disabled={!state.selectedModel || !state.deploymentType}
-        >
-          <Calculator className="w-6 h-6 mr-3" />
-          Calculate LLM Deployment Requirements
-        </Button>
-      </div>
+      )}
 
       {/* Results Dashboard */}
       {results && (
@@ -406,14 +538,16 @@ export const LLMCalculator = () => {
             onCopyConfig={handleCopyConfig}
           />
           
-          <SimulationDisplay
-            selectedModel={state.selectedModel}
-            performanceMetrics={results.performanceMetrics}
-            isRunning={isSimulationRunning}
-            onStartSimulation={() => setIsSimulationRunning(true)}
-            onStopSimulation={() => setIsSimulationRunning(false)}
-            onResetSimulation={() => setIsSimulationRunning(false)}
-          />
+          {selectedProvider?.type === 'opensource' && (
+            <SimulationDisplay
+              selectedModel={state.selectedModel}
+              performanceMetrics={results.performanceMetrics}
+              isRunning={isSimulationRunning}
+              onStartSimulation={() => setIsSimulationRunning(true)}
+              onStopSimulation={() => setIsSimulationRunning(false)}
+              onResetSimulation={() => setIsSimulationRunning(false)}
+            />
+          )}
         </div>
       )}
     </div>
