@@ -34,6 +34,7 @@ export const LLMCalculator = () => {
   const { data: deploymentFrameworks = [], isLoading: frameworksLoading } = useDeploymentFrameworks();
   const { data: models = [], isLoading: modelsLoading } = useLLMModels();
   
+  // All useState hooks must be at the top, before any conditional returns
   const [state, setState] = useState<CalculatorState>({
     deploymentType: undefined,
     quantization: quantizationOptions[0] || { id: 'fp16', name: 'FP16', bitsPerWeight: 16, memoryReduction: 1, performanceImpact: 1 },
@@ -48,6 +49,13 @@ export const LLMCalculator = () => {
     offloading: { cpu: 0, ram: 0, nvme: 0 },
     gpus: []
   });
+  
+  const [concurrentUsers, setConcurrentUsers] = useState(5);
+  const [gpuCount, setGpuCount] = useState(1);
+  const [ramAmount, setRamAmount] = useState(64);
+  const [storageAmount, setStorageAmount] = useState(500);
+  const [results, setResults] = useState<any>(null);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Update state when data loads
   React.useEffect(() => {
@@ -75,13 +83,6 @@ export const LLMCalculator = () => {
       </div>
     );
   }
-  
-  const [concurrentUsers, setConcurrentUsers] = useState(5);
-  const [gpuCount, setGpuCount] = useState(1);
-  const [ramAmount, setRamAmount] = useState(64);
-  const [storageAmount, setStorageAmount] = useState(500);
-  const [results, setResults] = useState<any>(null);
-  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Handlers
   const handleDeploymentTypeChange = (type: 'cloud' | 'physical') => {
