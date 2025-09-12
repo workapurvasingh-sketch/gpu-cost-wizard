@@ -206,23 +206,26 @@ export const CloudInstanceSelector = ({
 
             {/* Cost Breakdown */}
             <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-              <Label className="text-sm font-medium">Cost Estimates</Label>
+              <Label className="text-sm font-medium">Cost Estimates (Pay-as-you-go)</Label>
               <div className="grid grid-cols-3 gap-4 mt-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Daily</p>
-                  <p className="font-semibold">${(selectedInstance.costPerHour * 24).toFixed(2)}</p>
+                  <p className="font-semibold">${(selectedInstance.costPerHour * 1).toFixed(2)}/day*</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Weekly</p>
-                  <p className="font-semibold">${(selectedInstance.costPerHour * 24 * 7).toFixed(2)}</p>
+                  <p className="font-semibold">${(selectedInstance.costPerHour * 7).toFixed(2)}/week*</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Monthly</p>
                   <p className="font-semibold text-primary">
-                    ${(selectedInstance.costPerHour * 24 * 30).toFixed(2)}
+                    ${(selectedInstance.costPerHour * 24 * 5).toFixed(2)}/month*
                   </p>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                * Costs shown for 1 hour daily usage. Scale as needed for your application.
+              </p>
             </div>
           </CardContent>
         </Card>

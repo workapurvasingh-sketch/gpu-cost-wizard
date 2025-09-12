@@ -107,9 +107,9 @@ export const APIConfiguration = ({
               step={1000}
               className="w-full"
             />
-            <div className="text-xs text-muted-foreground">
-              Estimated cost per request: ${costPerRequest.toFixed(4)}
-            </div>
+          <div className="text-xs text-muted-foreground">
+            Estimated cost per request: ${costPerRequest.toFixed(6)}
+          </div>
           </div>
 
           {/* Expected Users */}
@@ -177,7 +177,7 @@ export const APIConfiguration = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium">Cost per Request</Label>
-              <p className="text-lg font-semibold">${costPerRequest.toFixed(4)}</p>
+              <p className="text-lg font-semibold">${costPerRequest.toFixed(6)}</p>
             </div>
             <div>
               <Label className="text-sm font-medium">Hourly Cost</Label>

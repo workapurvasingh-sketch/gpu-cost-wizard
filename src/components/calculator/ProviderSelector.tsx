@@ -13,7 +13,7 @@ import { LLMProvider } from '@/types/calculator';
 interface ProviderSelectorProps {
   selectedProvider?: LLMProvider;
   onProviderSelect: (provider: LLMProvider) => void;
-  onApiKeyChange: (key: string) => void;
+  onApiKeyChange?: (key: string) => void;
 }
 
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
@@ -41,7 +41,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   );
 
   const handleApiKeySave = () => {
-    onApiKeyChange(apiKeyInput);
+    if (onApiKeyChange) {
+      onApiKeyChange(apiKeyInput);
+    }
     setShowApiKeyDialog(false);
   };
 
@@ -163,7 +165,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               </div>
             </div>
 
-            {selectedProvider.requiresApiKey && (
+            {/* Remove API key requirement for comparison */}
+            {false && selectedProvider.requiresApiKey && (
               <div className="flex items-center justify-between pt-2 border-t">
                 <span className="text-sm text-muted-foreground">
                   API Key Required
@@ -207,10 +210,10 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                 <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                   <Zap className="w-4 h-4" />
-                  <span className="text-sm font-medium">Server Usage</span>
+                  <span className="text-sm font-medium">API Usage</span>
                 </div>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  API providers handle model inference. Your server only needs to handle user requests and application logic.
+                  Estimate costs and performance without API keys. For production use, you'll need proper authentication.
                 </p>
               </div>
             )}

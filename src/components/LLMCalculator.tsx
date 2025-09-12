@@ -132,17 +132,124 @@ export const LLMCalculator = () => {
   // Calculation engine
   const calculatePerformanceMetrics = (): PerformanceMetrics => {
     const { selectedModel, quantization, framework, batchSize } = state;
-    const selectedGpu = state.gpus[0];
     
-    if (!selectedModel || !selectedGpu) {
-    return {
-      tokensPerSecond: 0,
-      latency: 0,
-      throughput: 0,
-      concurrentUsers: 0,
-      memoryUsage: { gpu: 0, cpu: 0, ram: 0, nvme: 0 },
-      perUserMetrics: { gpuMemory: 0, cpuMemory: 0, electricityCost: 0 }
-    };
+    if (!selectedModel) {
+      return {
+        tokensPerSecond: 0,
+        latency: 0,
+        throughput: 0,
+        concurrentUsers: 0,
+        memoryUsage: { gpu: 0, cpu: 0, ram: 0, nvme: 0 },
+        perUserMetrics: { gpuMemory: 0, cpuMemory: 0, electricityCost: 0 }
+      };
+    }
+
+    // API Provider Performance Calculation
+    if (selectedProvider?.type === 'api') {
+      // Use published API performance specs
+      let baseTokensPerSecond = 50; // Default
+      let baseLatency = 200; // Default ms
+      
+      // Provider-specific performance metrics
+      switch (selectedProvider.id) {
+        case 'openai':
+          baseTokensPerSecond = selectedModel.name.includes('gpt-4') ? 40 : 80;
+          baseLatency = selectedModel.name.includes('gpt-4') ? 300 : 150;
+          break;
+        case 'anthropic':
+          baseTokensPerSecond = 60;
+          baseLatency = 200;
+          break;
+        case 'google':
+          baseTokensPerSecond = 70;
+          baseLatency = 180;
+          break;
+        case 'meta':
+          baseTokensPerSecond = 90;
+          baseLatency = 120;
+          break;
+        default:
+          baseTokensPerSecond = 50;
+          baseLatency = 200;
+      }
+
+      // Adjust for context window usage
+      const contextFactor = Math.max(0.3, 1 - (contextWindow - 4096) / 50000);
+      const adjustedTokensPerSecond = Math.round(baseTokensPerSecond * contextFactor);
+      const adjustedLatency = Math.round(baseLatency / contextFactor);
+      
+      return {
+        tokensPerSecond: adjustedTokensPerSecond,
+        latency: adjustedLatency,
+        throughput: Math.round((adjustedTokensPerSecond / state.tokensPerRequest) * 10) / 10,
+        concurrentUsers: concurrentRequests,
+        memoryUsage: { 
+          gpu: 0, // API providers handle this
+          cpu: 0, 
+          ram: 0, 
+          nvme: 0 
+        },
+        perUserMetrics: {
+          gpuMemory: 0,
+          cpuMemory: 0,
+          electricityCost: (selectedModel.costPerMToken / 1000) * (contextWindow / 1000) // Cost per request
+        }
+      };
+    }
+
+    // Cloud Instance Performance Calculation
+    if (selectedProvider?.type === 'opensource' && state.deploymentType === 'cloud' && selectedCloudInstance) {
+      // Calculate performance based on cloud instance specs
+      const gpuPower = selectedCloudInstance.gpus * 100; // Estimate based on GPU count
+      let baseTokensPerSecond = gpuPower * 0.8; // GPUs are more efficient in cloud
+      
+      // Adjust for model size
+      const modelSizeFactor = Math.max(0.1, 1 - (selectedModel.memoryRequired - 7) / 100);
+      baseTokensPerSecond *= modelSizeFactor;
+      
+      // Apply framework and quantization effects
+      const frameworkBoost = framework.throughputMultiplier;
+      const quantizationBoost = quantization.performanceImpact;
+      const batchBoost = Math.log2(batchSize) * 0.5 + 1;
+      
+      const tokensPerSecond = baseTokensPerSecond * frameworkBoost * quantizationBoost * batchBoost;
+      const latency = 1000 / tokensPerSecond * 8; // Cloud has better latency
+      const throughput = tokensPerSecond / state.tokensPerRequest;
+      
+      // Memory calculations for cloud
+      const memoryUsage = selectedModel.memoryRequired * quantization.memoryReduction * framework.memoryOverhead;
+      const availableGpuMemory = selectedCloudInstance.gpus * 80; // Estimate 80GB per GPU in cloud
+      
+      return {
+        tokensPerSecond: Math.round(tokensPerSecond),
+        latency: Math.round(latency),
+        throughput: Math.round(throughput * 10) / 10,
+        concurrentUsers: concurrentUsers,
+        memoryUsage: { 
+          gpu: Math.min(Math.round(memoryUsage), availableGpuMemory),
+          cpu: Math.round(memoryUsage * 0.2), 
+          ram: Math.round(selectedCloudInstance.ram * 0.8), 
+          nvme: 0
+        },
+        perUserMetrics: {
+          gpuMemory: Math.round(memoryUsage / concurrentUsers * 100) / 100,
+          cpuMemory: Math.round(memoryUsage * 0.2 / concurrentUsers * 100) / 100,
+          electricityCost: selectedCloudInstance.costPerHour / concurrentUsers
+        }
+      };
+    }
+
+    // Physical Hardware Performance Calculation
+    const selectedGpu = state.gpus[0];
+    if (!selectedGpu) {
+      return {
+        tokensPerSecond: 0,
+        latency: 0,
+        throughput: 0,
+        concurrentUsers: 0,
+        memoryUsage: { gpu: 0, cpu: 0, ram: 0, nvme: 0 },
+        perUserMetrics: { gpuMemory: 0, cpuMemory: 0, electricityCost: 0 }
+      };
     }
 
     const baseTokensPerSecond = selectedGpu.bandwidth / 100 * quantization.performanceImpact;
@@ -226,6 +333,27 @@ export const LLMCalculator = () => {
   };
 
   const calculateCosts = () => {
+    // API Provider Costs
+    if (selectedProvider?.type === 'api') {
+      const costPerRequest = (state.selectedModel?.costPerMToken || 0) / 1000 * (contextWindow / 1000);
+      const hourlyCost = costPerRequest * state.requestsPerHour;
+      const monthlyCost = hourlyCost * 24 * 30;
+      
+      return {
+        totalCost: 0, // No upfront cost for API
+        monthlyCost: monthlyCost
+      };
+    }
+
+    // Cloud Instance Costs
+    if (selectedProvider?.type === 'opensource' && state.deploymentType === 'cloud' && selectedCloudInstance) {
+      return {
+        totalCost: 0, // No upfront cost for cloud
+        monthlyCost: selectedCloudInstance.costPerHour * 24 * 30
+      };
+    }
+
+    // Physical Hardware Costs
     const selectedGpu = state.gpus[0];
     const gpuCost = selectedGpu ? (selectedGpu.retailPrice || 0) * gpuCount : 0;
     const cpuCost = state.cpu?.retailPrice || 0;
@@ -362,7 +490,6 @@ export const LLMCalculator = () => {
             setSelectedProvider(provider);
             setCurrentStep('model');
           }}
-          onApiKeyChange={() => {}}
         />
       )}
 
@@ -518,6 +645,40 @@ export const LLMCalculator = () => {
               <Calculator className="w-5 h-5 mr-2" />
               Calculate Requirements
             </Button>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                // Reset all state
+                setState({
+                  deploymentType: undefined,
+                  quantization: quantizationOptions[0] || { id: 'fp16', name: 'FP16', bitsPerWeight: 16, memoryReduction: 1, performanceImpact: 1 },
+                  framework: deploymentFrameworks[0] || { id: 'vllm', name: 'vLLM', throughputMultiplier: 2.5, memoryOverhead: 1.2, supportedQuantization: [], supportsOffloading: true, offloadingTypes: [] },
+                  batchSize: 1,
+                  kvCache: true,
+                  expectedUsers: 10,
+                  requestsPerHour: 100,
+                  tokensPerRequest: 150,
+                  concurrentUsers: 5,
+                  contextWindow: 4096,
+                  offloading: { cpu: 0, ram: 0, nvme: 0 },
+                  gpus: []
+                });
+                setCurrentStep('provider');
+                setSelectedProvider(undefined);
+                setSelectedCloudProvider(undefined);
+                setSelectedCloudInstance(undefined);
+                setContextWindow(4096);
+                setConcurrentRequests(5);
+                setConcurrentUsers(5);
+                setGpuCount(1);
+                setRamAmount(64);
+                setStorageAmount(500);
+                setResults(null);
+                setIsSimulationRunning(false);
+              }}
+            >
+              Reset All
+            </Button>
           </div>
         </div>
       )}
@@ -538,16 +699,14 @@ export const LLMCalculator = () => {
             onCopyConfig={handleCopyConfig}
           />
           
-          {selectedProvider?.type === 'opensource' && (
-            <SimulationDisplay
-              selectedModel={state.selectedModel}
-              performanceMetrics={results.performanceMetrics}
-              isRunning={isSimulationRunning}
-              onStartSimulation={() => setIsSimulationRunning(true)}
-              onStopSimulation={() => setIsSimulationRunning(false)}
-              onResetSimulation={() => setIsSimulationRunning(false)}
-            />
-          )}
+          <SimulationDisplay
+            selectedModel={state.selectedModel}
+            performanceMetrics={results.performanceMetrics}
+            isRunning={isSimulationRunning}
+            onStartSimulation={() => setIsSimulationRunning(true)}
+            onStopSimulation={() => setIsSimulationRunning(false)}
+            onResetSimulation={() => setIsSimulationRunning(false)}
+          />
         </div>
       )}
     </div>
