@@ -35,6 +35,7 @@ export type ModelCapability = 'thinking' | 'tool_call' | 'image' | 'audio' | 'ca
 export interface GPU {
   id: string;
   name: string;
+  brand: string;
   memory: number;
   computeCapability: string;
   bandwidth: number; // GB/s
@@ -45,11 +46,15 @@ export interface GPU {
   compatibleMotherboards?: string[];
   generation: string;
   manufacturer: 'nvidia' | 'amd' | 'intel';
+  formFactor: string; // Dual-slot, Triple-slot, etc.
+  dimensions: string; // Length x Width x Height
+  coolingType: 'air' | 'liquid';
 }
 
 export interface CPU {
   id: string;
   name: string;
+  brand: string;
   cores: number;
   threads: number;
   baseClock: number;
@@ -61,15 +66,24 @@ export interface CPU {
   socket: string;
   compatibleMotherboards?: string[];
   manufacturer: 'intel' | 'amd';
+  generation: string;
+  architecture: string;
+  cacheL3: number; // MB
 }
 
 export interface RAM {
   id: string;
-  type: string;
-  capacity: number;
-  speed: number;
+  name: string;
+  brand: string;
+  type: string; // DDR4, DDR5
+  capacity: number; // GB per stick
+  speed: number; // MHz
   ecc: boolean;
   pricePerGB: number;
+  formFactor: string; // DIMM, SO-DIMM
+  voltage: number; // V
+  timings: string; // CL-RCD-RP-RAS
+  compatibleSockets: string[];
 }
 
 export interface Motherboard {
@@ -96,13 +110,71 @@ export interface PowerSupply {
 
 export interface Storage {
   id: string;
+  name: string;
+  brand: string;
   type: 'ssd' | 'hdd' | 'nvme';
-  capacity: number;
-  readSpeed: number;
-  writeSpeed: number;
+  capacity: number; // GB
+  readSpeed: number; // MB/s
+  writeSpeed: number; // MB/s
   iops: number;
   pricePerTB: number;
-  interface: string;
+  interface: string; // SATA, NVMe, PCIe
+  formFactor: string; // 2.5", 3.5", M.2
+  endurance?: number; // TBW for SSDs
+  powerConsumption: number; // Watts
+}
+
+export interface ServerRack {
+  id: string;
+  name: string;
+  brand: string;
+  units: number; // U height
+  width: number; // mm
+  depth: number; // mm
+  maxWeight: number; // kg
+  powerDistribution: string;
+  cooling: string;
+  retailPrice: number;
+}
+
+export interface Chassis {
+  id: string;
+  name: string;
+  brand: string;
+  formFactor: string; // 4U, 2U, 1U, Tower
+  motherboardSupport: string[]; // Supported form factors
+  gpuSlots: number;
+  maxGpuLength: number; // mm
+  storageSlots: {
+    "3.5inch": number;
+    "2.5inch": number;
+    "m.2": number;
+  };
+  psuSupport: string[]; // ATX, SFX, etc.
+  retailPrice: number;
+}
+
+export interface NetworkCard {
+  id: string;
+  name: string;
+  brand: string;
+  speed: string; // 1GbE, 10GbE, 25GbE, etc.
+  ports: number;
+  interface: string; // PCIe x8, PCIe x16
+  powerConsumption: number; // Watts
+  retailPrice: number;
+}
+
+export interface CoolingSystem {
+  id: string;
+  name: string;
+  brand: string;
+  type: 'air' | 'liquid' | 'hybrid';
+  maxTdp: number; // Watts
+  compatibleSockets: string[];
+  noiseLevel: number; // dB
+  dimensions: string; // LxWxH
+  retailPrice: number;
 }
 
 export interface CloudProvider {
@@ -218,12 +290,17 @@ export interface CalculatorState {
   customModel?: Partial<LLMModel>;
   
   // Hardware
-  gpus: GPU[];
-  cpu?: CPU;
-  ram?: RAM;
-  storage?: Storage;
+  serverRack?: ServerRack;
+  chassis?: Chassis;
   motherboard?: Motherboard;
+  cpu?: CPU;
+  ram?: RAM[];
+  ssdStorage?: Storage[];
+  hddStorage?: Storage[];
+  networkCard?: NetworkCard;
   powerSupply?: PowerSupply;
+  gpus: GPU[];
+  coolingSystem?: CoolingSystem;
   preBuiltServer?: PreBuiltServer;
   
   // Performance
@@ -243,6 +320,12 @@ export interface CalculatorState {
   // API Keys
   huggingFaceApiKey?: string;
   providerApiKey?: string;
+}
+
+export interface HardwareCompatibility {
+  isCompatible: boolean;
+  issues: string[];
+  warnings: string[];
 }
 
 export interface ValidationResult {

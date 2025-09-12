@@ -9,7 +9,7 @@ import {
 import { DeploymentSelector } from './calculator/DeploymentSelector';
 import { ProviderSelector } from './calculator/ProviderSelector';
 import { ModelSelectorAdvanced } from './calculator/ModelSelectorAdvanced';
-import { HardwareConfigurator } from './calculator/HardwareConfigurator';
+import { HardwareConfiguratorAdvanced } from './calculator/HardwareConfiguratorAdvanced';
 import { PerformanceSettings } from './calculator/PerformanceSettings';
 import { UsageSimulator } from './calculator/UsageSimulator';
 import { CostAnalyzer } from './calculator/CostAnalyzer';
@@ -573,20 +573,32 @@ export const LLMCalculator = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
                 {state.deploymentType === 'physical' && (
-                  <HardwareConfigurator
-                    deploymentType={state.deploymentType}
-                    selectedProvider={state.cloudProvider}
-                    selectedGpus={state.gpus}
-                    gpuCount={gpuCount}
-                    selectedCpu={state.cpu}
-                    ramAmount={ramAmount}
-                    storageAmount={storageAmount}
-                    onGpuChange={handleGpuChange}
-                    onGpuCountChange={setGpuCount}
-                    onCpuChange={handleCpuChange}
-                    onRamChange={setRamAmount}
-                    onStorageChange={setStorageAmount}
-                  />
+                   <HardwareConfiguratorAdvanced
+                     deploymentType={state.deploymentType}
+                     selectedProvider={state.cloudProvider}
+                     selectedMotherboard={state.motherboard}
+                     selectedCpu={state.cpu}
+                     selectedGpus={state.gpus}
+                     selectedRam={state.ram || []}
+                     selectedSsdStorage={state.ssdStorage || []}
+                     selectedHddStorage={state.hddStorage || []}
+                     selectedNetworkCard={state.networkCard}
+                     selectedPsu={state.powerSupply}
+                     selectedCooling={state.coolingSystem}
+                     selectedRack={state.selectedRack}
+                     selectedChassis={state.selectedChassis}
+                     onRackChange={(rack) => setState(prev => ({ ...prev, selectedRack: rack }))}
+                     onChassisChange={(chassis) => setState(prev => ({ ...prev, selectedChassis: chassis }))}
+                     onMotherboardChange={(motherboard) => setState(prev => ({ ...prev, motherboard }))}
+                     onCpuChange={handleCpuChange}
+                     onGpuChange={(gpus) => setState(prev => ({ ...prev, gpus }))}
+                     onRamChange={(ram) => setState(prev => ({ ...prev, ram }))}
+                     onSsdStorageChange={(ssdStorage) => setState(prev => ({ ...prev, ssdStorage }))}
+                     onHddStorageChange={(hddStorage) => setState(prev => ({ ...prev, hddStorage }))}
+                     onNetworkCardChange={(networkCard) => setState(prev => ({ ...prev, networkCard }))}
+                     onPsuChange={(psu) => setState(prev => ({ ...prev, powerSupply: psu }))}
+                     onCoolingChange={(cooling) => setState(prev => ({ ...prev, coolingSystem: cooling }))}
+                   />
                 )}
 
                 <PerformanceSettings
