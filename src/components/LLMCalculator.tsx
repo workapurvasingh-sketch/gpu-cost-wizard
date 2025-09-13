@@ -585,10 +585,10 @@ export const LLMCalculator = () => {
                      selectedNetworkCard={state.networkCard}
                      selectedPsu={state.powerSupply}
                      selectedCooling={state.coolingSystem}
-                     selectedRack={state.selectedRack}
-                     selectedChassis={state.selectedChassis}
-                     onRackChange={(rack) => setState(prev => ({ ...prev, selectedRack: rack }))}
-                     onChassisChange={(chassis) => setState(prev => ({ ...prev, selectedChassis: chassis }))}
+                      selectedRack={state.serverRack}
+                      selectedChassis={state.chassis}
+                      onRackChange={(rack) => setState(prev => ({ ...prev, serverRack: rack }))}
+                      onChassisChange={(chassis) => setState(prev => ({ ...prev, chassis }))}
                      onMotherboardChange={(motherboard) => setState(prev => ({ ...prev, motherboard }))}
                      onCpuChange={handleCpuChange}
                      onGpuChange={(gpus) => setState(prev => ({ ...prev, gpus }))}
