@@ -1,10 +1,13 @@
 import React from 'react';
+import Navigation from '@/components/layout/Navigation';
 import { LLMCalculator } from '@/components/LLMCalculator';
 import heroImage from '@/assets/hero-bg.jpg';
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
+      
       {/* Hero Section */}
       <section className="relative py-20 px-4 overflow-hidden">
         <div 
